@@ -8,10 +8,11 @@ extern void calc_hash_table(HashTable *ht, u_char* file_cnt, ngx_uint_t len);
 extern void calc_diff_data_result(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 
 typedef struct node {
-	ngx_uint_t order_id;
-	u_char is_exist;
-	void *data;
-	ngx_uint_t len;
+	ngx_uint_t order_id; 	// 新chunk ID
+	ngx_uint_t match_order_id; 	// 匹配chunk ID
+	u_char is_exist; 		// 是否存在
+	void *data;				// 不存在 则有数据
+	ngx_uint_t len;			// 数据长度
 	struct node *next;
 } Node;
 
@@ -138,7 +139,7 @@ void calc_diff_data_result(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 			unmatch_size++;
 			p++;
 		} else {
-			ngx_uint_t order_id = int(p_order_id);
+			ngx_uint_t match_order_id = int(p_order_id);
 
 			if (unmatch_size > 0) {
 				Node *pNode = (Node*) malloc(sizeof(Node));
@@ -161,6 +162,7 @@ void calc_diff_data_result(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 			Node *pNode = (Node *)malloc(sizeof(Node));
 			pNode->is_exist = 1;
 			pNode->order_id = order_id++;
+			pNode->match_order_id = match_order_id;
 			pNode->data = NULL;
 
 			ht->list->tail->next = pNode;
