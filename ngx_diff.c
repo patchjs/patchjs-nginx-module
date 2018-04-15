@@ -15,6 +15,7 @@ typedef struct linked_list {
 } LinkedList;
 
 void initialize_list(LinkedList *list) {
+	list = (LinkedList*)malloc(sizeof(LinkedList));
 	list->head = NULL;
 	list->tail = NULL;
 	list->current = NULL;
@@ -53,8 +54,8 @@ u_char* substring(const u_char* src, ngx_int_t start, ngx_int_t end) {
 
 
 Result* calc_diff_data(u_char* local_file_cnt, u_char* file_cnt){
-	Result *result;
-	result->m = !0;
+	Result *result = (Result*) malloc(sizeof(Result));
+	result->m = false;
 	result->l = CHUNK_SIZE;
 	LinkedList *diff_data_list = NULL;
 	initialize_list(diff_data_list);
