@@ -1,20 +1,24 @@
-#include <ngx_core.h>
 #include <ngx_md5.h>
+#include <ngx_core.h>
 #include "hash_table.h"
 
 #define CHUNK_SIZE 20;
 
 extern void calc_hash_table(HashTable *ht, u_char* file_cnt, ngx_uint_t len);
+extern void calc_diff_data_result(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 
 typedef struct node {
+	ngx_uint_t order_id;
+	u_char is_exist;
 	void *data;
+	ngx_uint_t len;
 	struct node *next;
 } Node;
 
 typedef struct linked_list {
 	Node *head;
 	Node *tail;
-	Node *current;
+	// Node *current;
 } LinkedList;
 
 void initialize_list(LinkedList **list) {
@@ -72,7 +76,9 @@ Result* calc_diff_data(u_char* src_file_cnt, ngx_uint_t src_len, u_char* dst_fil
 	}
 
 	calc_hash_table(result->ht_dst, dst_file_cnt, dst_len); // calc remote file context hash table
+	calc_diff_data_result(result->ht_dst, src_file_cnt, src_len); // calc remote file context hash table
 
+	return result;
 }
 
 u_char* md5(const u_char* cnt) {
@@ -87,8 +93,35 @@ u_char* md5(const u_char* cnt) {
 void calc_hash_table(HashTable *ht, u_char* file_cnt, ngx_uint_t len) 
 {
 	u_char *p = file_cnt;
-	ngx_uint_t key_index = 0;
-	for (int i=0; i<len; i+=CHUNK_SIZE) {
+	ngx_uint_t order_id = 1;
+	for (int i=0; i<len; ) {
+		// char key[32];
+		u_char chunk[CHUNK_SIZE] = {0};
+
+		ngx_uint_t get_size = CHUNK_SIZE;
+		if (len - i < CHUNK_SIZE) {
+			get_size = CHUNK_SIZE - i;
+		}
+
+		ngx_strncpy(chunk, p, get_size);
+        // sprintf(key, "%d", order_id);
+		hash_table_put(ht, md5(chunk), order_id++)
+
+		p += get_size;
+		i += get_size;
+	}
+}
+
+void calc_diff_data_result(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
+{
+	u_char *p = file_cnt;
+	ngx_uint_t order_id = 1;
+
+	u_char *unmatch_start = file_cnt;
+	ngx_uint_t unmatch_size = 0;
+
+	bool isfirst = false;
+	for (int i=0; i<len; ) {
 		char key[32];
 		u_char chunk[CHUNK_SIZE] = {0};
 
@@ -98,10 +131,51 @@ void calc_hash_table(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 		}
 
 		ngx_strncpy(chunk, p, get_size);
-        sprintf(key, "%d", key_index);
-		hash_table_put(ht, key, md5(chunk))
+		u_char *md5_result = md5(chunk);
+		void *p_order_id = hash_table_get(ht, md5_result);
+		if (p_order_id == NULL) {
+			i++;
+			unmatch_size++;
+			p++;
+		} else {
+			ngx_uint_t order_id = int(p_order_id);
 
-		key_index++;
-		p += CHUNK_SIZE;
-	}
+			if (unmatch_size > 0) {
+				Node *pNode = (Node*) malloc(sizeof(Node));
+				pNode->is_exist = 0;
+				pNode->order_id = order_id++;
+				pNode->len = unmatch_size;
+				pNode->data = (u_char *)malloc(sizeof(u_char) * unmatch_size);
+				ngx_strncpy(pNode->data, unmatch_start, unmatch_size);
+
+				ht->list->tail->next = pNode;
+				pNode->next = ht->list->head;
+				ht->list->tail = pNode;
+
+				if (ht->list->head == NULL) {
+					ht->list->head = pNode
+				}
+
+			}
+
+			Node *pNode = (Node *)malloc(sizeof(Node));
+			pNode->is_exist = 1;
+			pNode->order_id = order_id++;
+			pNode->data = NULL;
+
+			ht->list->tail->next = pNode;
+			pNode->next = ht->list->head;
+			ht->list->tail = pNode;
+
+			if (ht->list->head == NULL) {
+				ht->list->head = pNode
+			}
+
+			p += get_size;
+			i += get_size;
+
+			unmatch_start = p;
+			unmatch_size = 0;
+		}
+	}	
 }
