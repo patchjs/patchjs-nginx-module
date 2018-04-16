@@ -116,38 +116,43 @@ void calc_hash_table(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 
 void calc_diff_data_result(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 {
-	u_char *p = file_cnt;
-	ngx_uint_t order_id = 1;
+	u_char *p = file_cnt; // 本地文件
+	ngx_uint_t order_id = 1; // 初始chunk id
 
-	u_char *unmatch_start = file_cnt;
-	ngx_uint_t unmatch_size = 0;
+	u_char *unmatch_start = file_cnt; // 指向开始不匹配的的地址
+	ngx_uint_t unmatch_size = 0; // 不匹配的长度
 
 	for (int i=0; i<len; ) {
 		char key[32];
 		u_char chunk[CHUNK_SIZE] = {0};
 
+        // 或许chunk_size 剩余长度不足一个chunk大小 则有多少取多少
 		ngx_uint_t get_size = CHUNK_SIZE;
 		if (len - i < CHUNK_SIZE) {
 			get_size = CHUNK_SIZE - i;
 		}
 
+        // 拷贝一个chunk 并计算此chunk的md5
 		ngx_strncpy(chunk, p, get_size);
 		u_char *md5_result = md5(chunk);
+        
+        // 在目标文件的hash table中找此chunk的md5, 如果找到了p_order_id不为NULL，反之亦然
 		void *p_order_id = hash_table_get(ht, md5_result);
-		if (p_order_id == NULL) {
+		if (p_order_id == NULL) { // 未找到
 			i++;
 			unmatch_size++;
 			p++;
-		} else {
-			ngx_uint_t match_order_id = int(p_order_id);
+		} else { // 已找到
+			ngx_uint_t match_order_id = int(p_order_id); // 目标文件的chunk ID    类型转换 void * 转化为 int
 
+            //  unmatch_size大于0的话，说明匹配chunk成功之前有不能匹配的数据, 所以先把不匹配的数据组成一个不定长度的chunk，再对匹配的chunk做记录
 			if (unmatch_size > 0) {
 				Node *pNode = (Node*) malloc(sizeof(Node));
 				pNode->is_exist = 0;
 				pNode->order_id = order_id++;
-				pNode->len = unmatch_size;
-				pNode->data = (u_char *)malloc(sizeof(u_char) * unmatch_size);
-				ngx_strncpy(pNode->data, unmatch_start, unmatch_size);
+				pNode->len = unmatch_size; // 不匹配的数据长度
+				pNode->data = (u_char *)malloc(sizeof(u_char) * unmatch_size); 
+				ngx_strncpy(pNode->data, unmatch_start, unmatch_size); // 记录数据
 
 				ht->list->tail->next = pNode;
 				pNode->next = ht->list->head;
@@ -159,11 +164,12 @@ void calc_diff_data_result(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 
 			}
 
+            // 匹配的chunk
 			Node *pNode = (Node *)malloc(sizeof(Node));
-			pNode->is_exist = 1;
+			pNode->is_exist = 1; // 已存在
 			pNode->order_id = order_id++;
-			pNode->match_order_id = match_order_id;
-			pNode->data = NULL;
+			pNode->match_order_id = match_order_id; // 匹配的chunk ID
+			pNode->data = NULL; // 数据不记录
 
 			ht->list->tail->next = pNode;
 			pNode->next = ht->list->head;
@@ -181,3 +187,4 @@ void calc_diff_data_result(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 		}
 	}	
 }
+
