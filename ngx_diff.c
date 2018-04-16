@@ -67,11 +67,12 @@ Result* calc_diff_data(u_char* src_file_cnt, ngx_uint_t src_len, u_char* dst_fil
 	// result->ht_dst = 
 	hash_table_new(result->ht_dst);
 	hash_table_new(result->ht_src);
-	result->m = false;
+	result->m = true;
 	result->l = CHUNK_SIZE;
 	LinkedList *diff_data_list = NULL;
 	initialize_list(diff_data_list);
 	if (ngx_strcmp(md5(local_file_cnt), md5(file_cnt)) == 0) {
+		result->m = false;
 		result->diff_data_list = diff_data_list;
 		return result;
 	}
@@ -121,7 +122,6 @@ void calc_diff_data_result(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 	u_char *unmatch_start = file_cnt;
 	ngx_uint_t unmatch_size = 0;
 
-	bool isfirst = false;
 	for (int i=0; i<len; ) {
 		char key[32];
 		u_char chunk[CHUNK_SIZE] = {0};
