@@ -1,4 +1,5 @@
 #include "hash_table.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -18,6 +19,7 @@ struct kv
 struct HashTable
 {
     struct kv ** table;
+    ngx_pool_t *pool;
 };
 
 /* constructor of struct kv */
@@ -51,14 +53,15 @@ static unsigned int hash_33(char* key)
 }
 
 /* new a HashTable instance */
-HashTable* hash_table_new()
+HashTable* hash_table_new(ngx_pool_t *pool)
 {
-    HashTable* ht = malloc(sizeof(HashTable));
+    HashTable* ht = ngx_palloc(pool, sizeof(HashTable)); 
     if (NULL == ht) {
         hash_table_delete(ht);
         return NULL;
     }
-    ht->table = malloc(sizeof(struct kv*) * TABLE_SIZE);
+    ht->pool = pool;
+    ht->table = ngx_palloc(pool, sizeof(struct kv*) * TABLE_SIZE);
     if (NULL == ht->table) {
         hash_table_delete(ht);
         return NULL;
@@ -67,6 +70,7 @@ HashTable* hash_table_new()
 
     return ht;
 }
+
 /* delete a HashTable instance */
 void hash_table_delete(HashTable* ht)
 {
@@ -110,11 +114,11 @@ int hash_table_put2(HashTable* ht, char* key, void* value, void(*free_value)(voi
     }
 
     if (p == NULL) {/* if key has not been stored, then add it */
-        char* kstr = malloc(strlen(key) + 1);
+        char* kstr = ngx_palloc(ht->pool, strlen(key) + 1);
         if (kstr == NULL) {
             return -1;
         }
-        struct kv * kv = malloc(sizeof(struct kv));
+        struct kv * kv = ngx_palloc(ht->pool, sizeof(struct kv));
         if (NULL == kv) {
             free(kstr);
             kstr = NULL;

@@ -1,12 +1,14 @@
 #ifndef __HASH_TABLE_H__
 #define __HASH_TABLE_H__
 
+#include "ngx_core.h"
+
 #pragma once
 
 typedef struct HashTable HashTable;
 
 /* new an instance of HashTable */
-HashTable* hash_table_new();
+HashTable* hash_table_new(ngx_pool_t *pool);
 
 /*
 delete an instance of HashTable,
