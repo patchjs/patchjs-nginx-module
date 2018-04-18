@@ -7,7 +7,7 @@
 ngx_pool_t *g_pool = NULL;
 
 extern static void checksum(HashTable *ht, u_char* file_cnt, ngx_uint_t len);
-extern static void roll(HashTable *ht, ngx_array_t diff_array, u_char* file_cnt, ngx_uint_t len);
+extern static ngx_uint_t roll(HashTable *ht, ngx_array_t diff_array, u_char* file_cnt, ngx_uint_t len);
 extern static ngx_int_t find_match_order_id(HashTable *ht, u_char *md5_result, ngx_int_t last_order_id);
 
 typedef struct diff_data{
@@ -18,10 +18,6 @@ typedef struct diff_data{
 } DiffData;
 
 typedef struct result {
-	ngx_int_t m;
-	ngx_int_t l;
-	u_char *content;
-
 	HashTable *ht_dst;
 	HashTable *ht_src;
 
@@ -29,19 +25,29 @@ typedef struct result {
 	ngx_array_t *diff_array;
 } Result;
 
-u_char* calc_diff_data(u_char* src_file_cnt, ngx_uint_t src_len, u_char* dst_file_cnt, ngx_uint_t dst_len){
-	g_pool = ngx_pool_create(1024);
+ngx_str_t * calc_diff_data(ngx_pool_t *pool, u_char* src_file_cnt, ngx_uint_t src_len, u_char* dst_file_cnt, ngx_uint_t dst_len)
+{
+	ngx_str_t *res = (ngx_str_t *)ngx_palloc(sizeof(ngx_str_t));
+	u_char prefix[32] = {0};
+	ngx_str_t tail = ngx_string("]\"}")
+
+	u_char *p_content = NULL;
+	ngx_uint_t move_len = 0;
+
 	Result *result = ngx_palloc(g_pool, sizeof(Result));
-	result->pool = g_pool;
-	result->m = true;
-	result->l = CHUNK_SIZE;
+	result->pool = pool;
 
 	result->ht_dst = hash_table_new(result->pool);
 	result->ht_src = hash_table_new(result->pool);
 
+	ngx_memzero(prefix, sizeof(prefix));
 	if (ngx_strcmp(md5(local_file_cnt), md5(file_cnt)) == 0) {
-		result->m = false;
-		return result;
+		ngx_sprintf(prefix, "{\"m\":false,\"l\":%d,\"c\":[]}", CHUNK_SIZE);
+		res->len = ngx_strlen(prefix);
+		res->data = (u_char*)ngx_palloc(sizeof(u_char) * res->len);
+		ngx_memcpy(res->data, prefix, res->len);
+
+		return &res;
 	}
 
 	result->diff_array = (ngx_array_t*)ngx_array_create(ht->pool, 16, sizeof(DiffData));
@@ -49,9 +55,17 @@ u_char* calc_diff_data(u_char* src_file_cnt, ngx_uint_t src_len, u_char* dst_fil
 	checksum(result->ht_dst, dst_file_cnt, dst_len); // calc remote file context hash table
 	roll(result->ht_dst, result->diff_array, src_file_cnt, src_len); // calc remote file context hash table
 
-	result->content = (u_char*)ngx_palloc(pool, sizeof(u_char)*MAX_CONTENT_SIZE);
-	ngx_memzero(result->content, sizeof(u_char)*MAX_CONTENT_SIZE);
-	u_char *p_content = result->content;
+	// 准备res内存
+	res->len = src_file_cnt+32;
+	res->data = (u_char*)ngx_palloc(pool, res->len);
+	ngx_memzero(res->data, sizeof(u_char)*res->len);
+	u_char *p_content = res->data;
+
+	// 组头
+	ngx_sprintf(prefix, "{\"m\":true,\"l\":%d,\"c\":[", CHUNK_SIZE);
+	move_len = ngx_strlen(prefix);
+	ngx_memcpy(p_content, prefix, move_len);
+	p_content += move_len;
 
 	DiffData *last_item = NULL;
 	ngx_uint_t match_count = 0;
@@ -92,12 +106,20 @@ u_char* calc_diff_data(u_char* src_file_cnt, ngx_uint_t src_len, u_char* dst_fil
 				p_content += _len;
 				match_count = 0;
 			}
+
+			*p_content++ = "\"";
 			p_content = ngx_memcpy(p_content, item->data, item->len);
 			p_content += item->len;
+			*p_content++ = "\"";
 		}
 		last_item = item;
 	}
-	return result->content;
+
+	// 组尾
+	ngx_memcpy(p_content, tail.data, tail.len);
+	p_content += tail.len;
+
+	return res;
 }
 
 // 计算md5 不能改变cnt的内容const
@@ -140,8 +162,9 @@ static void checksum(HashTable *ht, u_char* file_cnt, ngx_uint_t len)
 	}
 }
 
-static void roll(HashTable *ht, ngx_array_t diff_array, u_char* file_cnt, ngx_uint_t len)
+static ngx_uint_t roll(HashTable *ht, ngx_array_t diff_array, u_char* file_cnt, ngx_uint_t len)
 {
+	ngx_uint_t new_content_size = 0;
 	u_char *p = file_cnt; // 本地文件
 	ngx_uint_t order_id = 1; // 初始chunk id
 
@@ -177,7 +200,9 @@ static void roll(HashTable *ht, ngx_array_t diff_array, u_char* file_cnt, ngx_ui
 				unmatch_diff.match = false;
 				unmatch_diff.order_id = -1;
 				unmatch_diff.start = unmatch_start;
-				unmatch_diff.len = unmatch_len;
+				unmatch_diff.len = unmatch_len
+				
+				new_content_size += unmatch_len + 3;
 			}
 
 			match_diff = ngx_array_push(diff_array); // 添加一个元素
@@ -185,6 +210,8 @@ static void roll(HashTable *ht, ngx_array_t diff_array, u_char* file_cnt, ngx_ui
 			match_diff.order_id = match_order_id;
 			match_diff.start = NULL;
 			match_diff.len = 0;
+
+			new_content_size += 10;
 
 			p += get_size;
 			i += get_size;
@@ -226,9 +253,3 @@ static ngx_int_t find_match_order_id(HashTable *ht, u_char *md5_result, ngx_int_
 
 	return order_ids[0];
 }
-
-void cleanup_pool() 
-{
-	ngx_destroy_pool(g_pool);
-}
-
