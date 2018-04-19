@@ -16,6 +16,7 @@ static ngx_int_t ngx_http_patchjs_read_file(u_char *buffer, ngx_http_request_t *
 static ngx_int_t ngx_http_patchjs_init(ngx_conf_t *cf);
 static void *ngx_http_patchjs_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_patchjs_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
+static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r);
 
 
 /* static ngx_str_t  ngx_http_patchjs_default_types[] = {
@@ -421,7 +422,7 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
 
     ngx_str_t new_filename, old_filename;
     ngx_str_t new_version, old_version;
-    ngx_uint_t dot_cnt = 0, ngx_uint_t slash_cnt = 0, basename_cnt = 0, count = 0;
+    ngx_uint_t dot_cnt = 0, slash_cnt = 0, basename_cnt = 0, count = 0;
 
     ngx_int_t read_file_ret = -1;
 
@@ -435,6 +436,8 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         return NGX_DECLINED;
     }
 
+    ngx_http_core_loc_conf_t *ccf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+
     // 丢弃客户端发过来的请求
     ngx_int_t rc = ngx_http_discard_request_body(r);
     if (rc != NGX_OK) {
@@ -442,14 +445,15 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     }
 
     // 资源的路径保存在path
+    size_t root;
     ngx_str_t path;
     if (ngx_http_map_uri_to_path(r, &path, &root, 0) == NULL) {
        return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    u_char *p = path.data + path.len - 1
+    u_char *p = path.data + path.len - 1;
     // 解析old_verison、new_version
-    for (i = path.len - 1; i >= 0; i--) {
+    for (int i = path.len - 1; i >= 0; i--) {
         if (*p == '.' && dot_cnt == 0) {
             dot_cnt++;
 
@@ -466,7 +470,7 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
                 basename_cnt = 1;
             }
         } else if (*p == '/') {
-            if (slash_cnt == 0) 
+            if (slash_cnt == 0) {
                 count = 0;
 
                 // base file name
@@ -488,7 +492,7 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     }
     
     ngx_open_file_info_t of;
-    ngx_http_core_loc_conf_t *ccf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+    // ngx_memzero(&of, sizeof(ngx_open_file_info_t));
     ngx_memzero(&of, sizeof(ngx_open_file_info_t));
     of.read_ahead = ccf->read_ahead;
     of.directio = ccf->directio;
