@@ -43,6 +43,8 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 
 	ngx_memzero(prefix, sizeof(prefix));
 	u_char src_md5[16], dst_md5[16];
+	ngx_memzero(src_md5, sizeof(src_md5));
+	ngx_memzero(dst_md5, sizeof(dst_md5));
 	make_md5(src_file_cnt, src_len, src_md5);
 	make_md5(dst_file_cnt, dst_len, dst_md5);
 	if (ngx_strcmp(src_md5, dst_md5) == 0) {
@@ -69,6 +71,7 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 	move_len = ngx_strlen(prefix);
 	ngx_memcpy(p_content, prefix, move_len);
 	p_content += move_len;
+	u_char *p_content_start = p_content;
 
 	DiffData *last_item = NULL;
 	ngx_uint_t match_count = 0;
@@ -76,10 +79,14 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 	for (int i = 0, size = result->diff_array->nelts; i < size; i++) {
 		DiffData *item = p + i;
 		u_char temp[16] = {0};
+		ngx_memzero(temp, sizeof(temp));
 		ngx_uint_t _len = 0;
 
 		if (item->match) {
 			if (last_item == NULL || !last_item->match) {
+				if (p_content_start != p_content) {
+					*p_content++ = ',';
+				}
 				ngx_snprintf(temp, 16, "[%d,", item->order_id);
 				_len = ngx_strlen(temp);
 				ngx_memcpy(p_content, temp, _len);
@@ -88,10 +95,17 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 			} else if (last_item->match && (last_item->order_id+1) == item->order_id) {
 				match_count++;
 			} else if (last_item->match && (last_item->order_id+1) != item->order_id) {
-				ngx_snprintf(temp, 16, "%d", match_count);
+				ngx_snprintf(temp, 16, "%d]", match_count);
 				_len = ngx_strlen(temp);
 				ngx_memcpy(p_content, temp, _len);
 				p_content += _len;
+
+				ngx_memzero(temp, sizeof(temp));
+				ngx_snprintf(temp, 16, ",[%d,", item->order_id);
+				_len = ngx_strlen(temp);
+				ngx_memcpy(p_content, temp, _len);
+				p_content += _len;
+
 				match_count = 1;
 			}
 
@@ -108,9 +122,11 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 				ngx_memcpy(p_content, temp, ngx_strlen(temp));
 				p_content += _len;
 				match_count = 0;
-			}
+			} 
 
-			*p_content++ = ',';
+			if (p_content_start != p_content) {
+				*p_content++ = ',';
+			}
 			*p_content++ = '"';
 			ngx_memcpy(p_content, item->start, item->len);
 			p_content += item->len;

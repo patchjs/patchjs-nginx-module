@@ -502,10 +502,6 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     // diff逻辑
     ngx_str_t *res = calc_diff_data(r, new_version_buffer.data, new_version_buffer.len, old_version_buffer.data, old_version_buffer.len);
 
-    u_char log_data[1024];
-    ngx_memzero(log_data, 1024);
-    ngx_memcpy(log_data, res->data, res->len);
-
     ngx_str_t type = ngx_string("text/plain");
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = res->len;
