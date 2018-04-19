@@ -19,13 +19,6 @@ static char *ngx_http_patchjs_merge_loc_conf(ngx_conf_t *cf, void *parent, void 
 static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r);
 
 
-/* static ngx_str_t  ngx_http_patchjs_default_types[] = {
-    ngx_string("application/x-javascript"),
-    ngx_string("text/css"),
-    ngx_null_string
-}; */
-
-
 static ngx_command_t  ngx_http_patchjs_commands[] = {
     { ngx_string("patchjs"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
@@ -378,21 +371,21 @@ ngx_int_t ngx_http_patchjs_get_file_buffer(ngx_http_request_t *r, ngx_http_core_
     of.events = ccf->open_file_cache_events;
 
     ngx_str_t filename;
-    filename.len = root_path->len + 1 + version->len + 1 + base_filename->len + 1 + ext->len;
+    filename.len = root_path->len + version->len + 1 + base_filename->len + 1 + ext->len;
     filename.data = ngx_palloc(r->pool, sizeof(u_char) * filename.len);
 
     u_char *p = filename.data;
     ngx_memcpy(p, root_path->data, root_path->len);
     p += root_path->len;
-    *p++ = "/";
+    // *p++ = "/";
 
     ngx_memcpy(p, version->data, version->len);
     p += version->len;
-    *p++ = "/";
+    *p++ = '/';
 
     ngx_memcpy(p, base_filename->data, base_filename->len);
     p += base_filename->len;
-    *p++ = ".";
+    *p++ = '.';
 
     ngx_memcpy(p, ext->data, ext->len);
     p += ext->len;
@@ -406,8 +399,9 @@ ngx_int_t ngx_http_patchjs_get_file_buffer(ngx_http_request_t *r, ngx_http_core_
     if (buffer == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
+    buffer->len = of.size;
 
-    ngx_int_t read_file_ret = ngx_http_patchjs_read_file(buffer, r, &of);
+    ngx_int_t read_file_ret = ngx_http_patchjs_read_file(buffer->data, r, &of);
     if (read_file_ret != NGX_OK) {
         return read_file_ret;
     }
@@ -420,11 +414,11 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     ngx_str_t root_path = ngx_string("/Users/Stone/www/"); // 需要修改,通过配置获取
     ngx_str_t base_filename, ext;                          // 基础文件名和后缀类型
 
-    ngx_str_t new_filename, old_filename;
+    // ngx_str_t new_filename, old_filename;
     ngx_str_t new_version, old_version;
-    ngx_uint_t dot_cnt = 0, slash_cnt = 0, basename_cnt = 0, count = 0;
+    ngx_uint_t dot_cnt = 0, slash_cnt = 0, across_cnt = 0, count = 0;
 
-    ngx_int_t read_file_ret = -1;
+    // ngx_int_t read_file_ret = -1;
 
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
         return NGX_DECLINED;
@@ -447,9 +441,11 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     // 资源的路径保存在path
     size_t root;
     ngx_str_t path;
-    if (ngx_http_map_uri_to_path(r, &path, &root, 0) == NULL) {
+    u_char *last = ngx_http_map_uri_to_path(r, &path, &root, 0);
+    if (last == NULL) {
        return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
+    path.len = last - path.data;
 
     u_char *p = path.data + path.len - 1;
     // 解析old_verison、new_version
@@ -458,37 +454,30 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
             dot_cnt++;
 
             // 文件后缀获取
-            ext.len = count + 1;
-            ext.data = p;
+            ext.len = count;
+            ext.data = p+1;
+        } else if (*p == '-' && across_cnt == 0) {
+            across_cnt++;
 
-            count = 0;
-        } else if (*p == '-') {
             // 旧版本号
-            old_version.len = count - 1;
             old_version.data = p + 1;
-            if (basename_cnt == 0) {
-                basename_cnt = 1;
-            }
+            old_version.len = ext.data - old_version.data - 1;
         } else if (*p == '/') {
             if (slash_cnt == 0) {
-                count = 0;
-
                 // base file name
                 base_filename.data = p + 1;
-                base_filename.len = basename_cnt-1;
+                base_filename.len = old_version.data - base_filename.data - 1;
             } else if (slash_cnt == 1) {
                 // 新版本号
-                new_version.len = count - 1;
                 new_version.data = p + 1;
+                new_version.len = base_filename.data - new_version.data - 1;
                 break;
             }
             slash_cnt++;
         }
-        if (basename_cnt > 0) {
-            basename_cnt++;
-        }
-        p--;
+
         count++;
+        p--;
     }
     
     ngx_open_file_info_t of;
@@ -504,12 +493,18 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     // 获取两文件内容
     ngx_str_t new_version_buffer, old_version_buffer;
     ngx_int_t ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &old_version, &old_version_buffer);
-    if (ret != NGX_OK) return NGX_ERROR;
+    if (ret != NGX_OK) {
+        return NGX_ERROR;
+    }
     ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &new_version, &new_version_buffer);
     if (ret != NGX_OK) return NGX_ERROR;
 
     // diff逻辑
-    ngx_str_t *res = calc_diff_data(r->pool, new_version_buffer.data, new_version_buffer.len, old_version_buffer.data, old_version_buffer.len);
+    ngx_str_t *res = calc_diff_data(r, new_version_buffer.data, new_version_buffer.len, old_version_buffer.data, old_version_buffer.len);
+
+    u_char log_data[1024];
+    ngx_memzero(log_data, 1024);
+    ngx_memcpy(log_data, res->data, res->len);
 
     ngx_str_t type = ngx_string("text/plain");
     r->headers_out.status = NGX_HTTP_OK;

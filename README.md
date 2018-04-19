@@ -72,3 +72,19 @@ nginx module
         "popcode.js.map"
     ]
 }
+
+localhost/1.0.1/hello-1.0.0.c
+
+
+{
+    "m": true,
+    "l": 20,
+    "c": [
+        [
+            0,
+            15
+        ],
+        " NGX_ERROR;"
+    ]
+}
+
