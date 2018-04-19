@@ -516,8 +516,9 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     if (b == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
-    b->pos = res->data;
-    b->last = b->pos  + res->len;
+
+    ngx_memcpy(b->pos, res->data, res->len);  
+    b->last = b->pos + res->len;
     b->last_buf = 1;
 
     ngx_chain_t out;
