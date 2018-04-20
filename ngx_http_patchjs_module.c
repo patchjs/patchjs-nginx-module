@@ -360,7 +360,6 @@ static ngx_int_t ngx_http_patchjs_init(ngx_conf_t *cf) {
 
 ngx_int_t ngx_http_patchjs_get_file_buffer(ngx_http_request_t *r, ngx_http_core_loc_conf_t *ccf, ngx_str_t *root_path, ngx_str_t *base_filename, ngx_str_t *ext, ngx_str_t *version, ngx_str_t *buffer)
 {
-    // filepath = root_path/version/base_filename.ext root路径/版本/文件名.后缀
     ngx_open_file_info_t of;
     ngx_memzero(&of, sizeof(ngx_open_file_info_t));
     of.read_ahead = ccf->read_ahead;
@@ -411,8 +410,8 @@ ngx_int_t ngx_http_patchjs_get_file_buffer(ngx_http_request_t *r, ngx_http_core_
 
 static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r) 
 {
-    ngx_str_t root_path;                                    //通过配置获取
-    ngx_str_t base_filename, ext;                           // 基础文件名和后缀类型
+    ngx_str_t root_path;                                    /* nginx root directory */
+    ngx_str_t base_filename, ext;                           /* filename and ext */
 
     ngx_str_t new_version, old_version;
     ngx_uint_t dot_cnt = 0, slash_cnt = 0, across_cnt = 0, count = 0;
@@ -421,24 +420,23 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         return NGX_DECLINED;
     }
 
-    // 获取location配置
+    /* get location config */
     ngx_http_patchjs_loc_conf_t *clcf = ngx_http_get_module_loc_conf(r, ngx_http_patchjs_module);
     if (!clcf->enable) {
         return NGX_DECLINED;
     }
 
     ngx_http_core_loc_conf_t *ccf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-    // 获取root目录
     root_path.data = ccf->root.data;
     root_path.len = ccf->root.len;
 
-    // 丢弃客户端发过来的请求
+    /* discard body */
     ngx_int_t rc = ngx_http_discard_request_body(r);
     if (rc != NGX_OK) {
         return rc;
     }
 
-    // 资源的路径保存在path
+    /* save resource path  */
     size_t root;
     ngx_str_t path;
     u_char *last = ngx_http_map_uri_to_path(r, &path, &root, 0);
@@ -448,27 +446,22 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     path.len = last - path.data;
 
     u_char *p = path.data + path.len - 1;
-    // 解析old_verison、new_version
     for (int i = path.len - 1; i >= 0; i--) {
         if (*p == '.' && dot_cnt == 0) {
             dot_cnt++;
 
-            // 文件后缀获取
             ext.len = count;
             ext.data = p+1;
         } else if (*p == '-' && across_cnt == 0) {
             across_cnt++;
 
-            // 旧版本号
             old_version.data = p + 1;
             old_version.len = ext.data - old_version.data - 1;
         } else if (*p == '/') {
             if (slash_cnt == 0) {
-                // base file name
                 base_filename.data = p + 1;
                 base_filename.len = old_version.data - base_filename.data - 1;
             } else if (slash_cnt == 1) {
-                // 新版本号
                 new_version.data = p + 1;
                 new_version.len = base_filename.data - new_version.data - 1;
                 break;
@@ -481,7 +474,6 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     }
     
     ngx_open_file_info_t of;
-    // ngx_memzero(&of, sizeof(ngx_open_file_info_t));
     ngx_memzero(&of, sizeof(ngx_open_file_info_t));
     of.read_ahead = ccf->read_ahead;
     of.directio = ccf->directio;
@@ -490,7 +482,7 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     of.errors = ccf->open_file_cache_errors;
     of.events = ccf->open_file_cache_events;
 
-    // 获取两文件内容
+    /* get file content */
     ngx_str_t new_version_buffer, old_version_buffer;
     ngx_int_t ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &old_version, &old_version_buffer);
     if (ret != NGX_OK) {
@@ -499,7 +491,7 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &new_version, &new_version_buffer);
     if (ret != NGX_OK) return NGX_ERROR;
 
-    // diff逻辑
+    /* diff */
     ngx_str_t *res = calc_diff_data(r, new_version_buffer.data, new_version_buffer.len, old_version_buffer.data, old_version_buffer.len);
 
     ngx_str_t type = ngx_string("text/plain");
