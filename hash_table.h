@@ -5,6 +5,7 @@
 
 #pragma once
 
+
 typedef struct HashTable HashTable;
 
 /* new an instance of HashTable */
