@@ -371,13 +371,13 @@ ngx_int_t ngx_http_patchjs_get_file_buffer(ngx_http_request_t *r, ngx_http_core_
     of.events = ccf->open_file_cache_events;
 
     ngx_str_t filename;
-    filename.len = root_path->len + version->len + 1 + base_filename->len + 1 + ext->len;
+    filename.len = root_path->len + 1 + version->len + 1 + base_filename->len + 1 + ext->len;
     filename.data = ngx_palloc(r->pool, sizeof(u_char) * filename.len);
 
     u_char *p = filename.data;
     ngx_memcpy(p, root_path->data, root_path->len);
     p += root_path->len;
-    // *p++ = "/";
+    *p++ = '/';
 
     ngx_memcpy(p, version->data, version->len);
     p += version->len;
@@ -411,14 +411,11 @@ ngx_int_t ngx_http_patchjs_get_file_buffer(ngx_http_request_t *r, ngx_http_core_
 
 static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r) 
 {
-    ngx_str_t root_path = ngx_string("/Users/Stone/www/"); // 需要修改,通过配置获取
-    ngx_str_t base_filename, ext;                          // 基础文件名和后缀类型
+    ngx_str_t root_path;                                    //通过配置获取
+    ngx_str_t base_filename, ext;                           // 基础文件名和后缀类型
 
-    // ngx_str_t new_filename, old_filename;
     ngx_str_t new_version, old_version;
     ngx_uint_t dot_cnt = 0, slash_cnt = 0, across_cnt = 0, count = 0;
-
-    // ngx_int_t read_file_ret = -1;
 
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
         return NGX_DECLINED;
@@ -431,6 +428,9 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     }
 
     ngx_http_core_loc_conf_t *ccf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+    // 获取root目录
+    root_path.data = ccf->root.data;
+    root_path.len = ccf->root.len;
 
     // 丢弃客户端发过来的请求
     ngx_int_t rc = ngx_http_discard_request_body(r);

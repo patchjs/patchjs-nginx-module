@@ -8,8 +8,8 @@
 ngx_pool_t *g_pool = NULL;
 
 static void checksum(ngx_http_request_t *r, HashTable *ht, u_char* file_cnt, ngx_uint_t len);
-static ngx_uint_t roll(ngx_http_request_t *r, HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt, ngx_uint_t len);
-static ngx_int_t find_match_order_id(ngx_http_request_t *r, HashTable *ht, u_char *md5_result, ngx_uint_t last_order_id);
+static ngx_uint_t roll(HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt, ngx_uint_t len);
+static ngx_int_t find_match_order_id(HashTable *ht, u_char *md5_result, ngx_uint_t last_order_id);
 static u_char* make_md5(const u_char* cnt, ngx_uint_t len, u_char *result);
 
 typedef struct diff_data{
@@ -42,12 +42,13 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 	result->ht_src = hash_table_new(pool);
 
 	ngx_memzero(prefix, sizeof(prefix));
-	u_char src_md5[16], dst_md5[16];
+	u_char src_md5[17], dst_md5[17];
 	ngx_memzero(src_md5, sizeof(src_md5));
 	ngx_memzero(dst_md5, sizeof(dst_md5));
 	make_md5(src_file_cnt, src_len, src_md5);
 	make_md5(dst_file_cnt, dst_len, dst_md5);
-	if (ngx_strcmp(src_md5, dst_md5) == 0) {
+
+	if (ngx_strncmp(src_md5, dst_md5, sizeof(src_md5)) == 0) {
 		ngx_sprintf(prefix, "{\"m\":false,\"l\":%d,\"c\":[]}", CHUNK_SIZE);
 		res->len = ngx_strlen(prefix);
 		res->data = (u_char*)ngx_palloc(pool, sizeof(u_char) * res->len);
@@ -58,7 +59,7 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 
 	result->diff_array = (ngx_array_t*)ngx_array_create(pool, 16, sizeof(DiffData));
 	checksum(r, result->ht_dst, dst_file_cnt, dst_len); // calc remote file context hash table
-	roll(r, result->ht_dst, result->diff_array, src_file_cnt, src_len); // calc remote file context hash table
+	roll(result->ht_dst, result->diff_array, src_file_cnt, src_len); // calc remote file context hash table
 
 	// 准备res内存
 	res->len = src_len + 32;
@@ -110,6 +111,7 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 			}
 
 			if (i == size - 1) {
+				ngx_memzero(temp, sizeof(temp));
 				ngx_snprintf(temp, 16, "%d]", match_count);
 				_len = ngx_strlen(temp);
 				ngx_memcpy(p_content, temp, _len);
@@ -163,12 +165,14 @@ static void checksum(ngx_http_request_t *r, struct HashTable *ht, u_char* file_c
 		ngx_array_t *order_ids = NULL;
 		ngx_uint_t *p_order_id = NULL;
 
-		if (len - 1 - i < CHUNK_SIZE) {
-			get_size = CHUNK_SIZE - (len - 1 - i);
+		if (len - i < CHUNK_SIZE) {
+			get_size = len - i;
 		}	
 
-		u_char md5_value[16] = {0};
+		u_char md5_value[17] = {0};
+		ngx_memzero(md5_value, sizeof(md5_value));
 		make_md5(p, get_size, md5_value);
+		// ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "old_md5: \"%s\" ", md5_value);
 		order_ids = (ngx_array_t *)hash_table_get(ht, (char *)md5_value);
 		if (order_ids == NULL) {
 			order_ids = ngx_array_create(pool, 4, sizeof(ngx_uint_t));
@@ -185,11 +189,10 @@ static void checksum(ngx_http_request_t *r, struct HashTable *ht, u_char* file_c
 	}
 }
 
-static ngx_uint_t roll(ngx_http_request_t *r, HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt, ngx_uint_t len)
+static ngx_uint_t roll(HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt, ngx_uint_t len)
 {
 	ngx_uint_t new_content_size = 0;
 	u_char *p = file_cnt; // 本地文件
-	// ngx_uint_t order_id = 1; // 初始chunk id
 
 	u_char *unmatch_start = file_cnt; // 指向开始不匹配的的地址
 	ngx_uint_t unmatch_len = 0; // 不匹配的长度
@@ -197,27 +200,23 @@ static ngx_uint_t roll(ngx_http_request_t *r, HashTable *ht, ngx_array_t *diff_a
 	ngx_int_t last_order_id = -1; // 
 
 	for (ngx_uint_t i=0; i<len; ) {
-		// ngx_int_t m_order_id = -1;
-
 		DiffData *match_diff = NULL;
 		DiffData *unmatch_diff = NULL;
 		// 或许chunk_size 剩余长度不足一个chunk大小 则有多少取多少
 		ngx_uint_t get_size = CHUNK_SIZE;
-		if (len - 1 - i < CHUNK_SIZE) {
-			get_size = CHUNK_SIZE - (len -1 - i);
+		if (len - i < CHUNK_SIZE) {
+			get_size = len - i;
 		}
 
         // 在目标文件的hash table中找此chunk的md5, 如果找到了p_order_id不为NULL，反之亦然
-		u_char md5_result[16] = {0};
+		u_char md5_result[17] = {0};
 		make_md5(p, get_size, md5_result);
-		ngx_int_t match_order_id = find_match_order_id(r, ht, md5_result, last_order_id);
+		ngx_int_t match_order_id = find_match_order_id(ht, md5_result, last_order_id);
 		if (match_order_id == -1) { // 未找到
 			i++;
 			unmatch_len++;
 			p++;
 		} else { // 已找到
-			// ngx_uint_t match_order_id = int(m_order_id); // 目标文件的chunk ID    类型转换 void * 转化为 int
-
             //  unmatch_size大于0的话，说明匹配chunk成功之前有不能匹配的数据, 所以先把不匹配的数据组成一个不定长度的chunk，再对匹配的chunk做记录
 			if (unmatch_len > 0) {
 				unmatch_diff = ngx_array_push(diff_array); // 添加一个元素
@@ -245,9 +244,8 @@ static ngx_uint_t roll(ngx_http_request_t *r, HashTable *ht, ngx_array_t *diff_a
 			last_order_id = match_order_id;
 		}
 
-		if (i == len - 1) {
+		if (i == len) {
 			if (unmatch_len > 0) {
-				// ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "patchjs  rool ----2-0");
 				unmatch_diff = ngx_array_push(diff_array); // 添加一个元素
 				unmatch_diff->match = 0;
 				unmatch_diff->order_id = -1;
@@ -262,7 +260,7 @@ static ngx_uint_t roll(ngx_http_request_t *r, HashTable *ht, ngx_array_t *diff_a
 	return 0;
 }
 
-static ngx_int_t find_match_order_id(ngx_http_request_t *r, HashTable *ht, u_char *md5_result, ngx_uint_t last_order_id)
+static ngx_int_t find_match_order_id(HashTable *ht, u_char *md5_result, ngx_uint_t last_order_id)
 {
 	ngx_array_t *value = (ngx_array_t*)hash_table_get(ht, (char *)md5_result);
 	if (value == NULL) {
