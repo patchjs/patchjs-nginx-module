@@ -130,7 +130,7 @@ static char *ngx_http_patchjs_merge_loc_conf(ngx_conf_t *cf, void *parent, void 
     ngx_http_patchjs_loc_conf_t *conf = child;
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
-    ngx_conf_merge_uint_value(conf->max_file_size, prev->max_file_size, 10);
+    ngx_conf_merge_uint_value(conf->max_file_size, prev->max_file_size, 1024);
 
     return NGX_CONF_OK;
 }
