@@ -9,16 +9,25 @@ URL: http://static.domain.com/path/to/1.0.1/file-1.0.0.js
 Result: {"m":[IS_MODIFIED],"l":[CHUNK_SIZE],"c":[CODE_DATA]}
 
 
+## Installation
+
+./configure --prefix=/usr/local/nginx --add-module=/path/to/patchjs-nginx-module
+
+make
+
+make install
+
+
 ## Configuration example
 
     location /static/css/ {
         patchjs on;
-        patchjs_max_file_size 20;
+        patchjs_max_file_size 1024;
     }
         
     location /static/js/ {
         patchjs on;
-        patchjs_max_file_size 30;
+        patchjs_max_file_size 1024;
     }
 
 
@@ -33,7 +42,6 @@ Result: {"m":[IS_MODIFIED],"l":[CHUNK_SIZE],"c":[CODE_DATA]}
 It enables the patchjs in a given context.
 
 <br/>
-<br/>
 
 **patchjs\_max\_file\_size** `number`kb
 
@@ -43,12 +51,3 @@ It enables the patchjs in a given context.
 
 Defines the **maximum** number of filesize that can be computed in a
 given context. 
-
-
-## Installation
-
-./configure --with-debug --prefix=/usr/local/nginx --add-module=/path/to/patchjs-nginx-module
-
-make
-
-make install
