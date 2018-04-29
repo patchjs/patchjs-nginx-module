@@ -269,16 +269,17 @@ static ngx_int_t find_match_order_id(HashTable *ht, u_char *md5_result, ngx_uint
 		ngx_uint_t last_id = order_ids[0];
 		ngx_uint_t result_id = 0;
 		for (ngx_uint_t i=0; i<value->nelts; i++) {
-			ngx_uint_t id = order_ids[0];
+			ngx_uint_t id = order_ids[i];
 			if (id >= last_order_id && last_id <= last_order_id) {
 				return (last_order_id - last_id) >= (id - last_order_id) ? id : last_id;
-			} else if (id >= last_order_id && last_id <= last_order_id) {
+			} else if (id >= last_order_id && last_id >= last_order_id) {
 				return last_id;
 			} else if (id <= last_order_id && last_id <= last_order_id) {
-				return id;
+				result_id = id;
 			} else {
 				result_id = id;
 			}
+			last_id = id;
 		}
 		return result_id;
 	}
