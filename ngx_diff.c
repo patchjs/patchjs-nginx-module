@@ -3,7 +3,6 @@
 #include "ngx_diff.h"
 
 #define CHUNK_SIZE 20
-#define MAX_CONTENT_SIZE (2*1024*1024)
 
 ngx_pool_t *g_pool = NULL;
 
@@ -195,19 +194,25 @@ static ngx_uint_t roll(HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt,
 	ngx_uint_t unmatch_len = 0; /* unmatch length */
 
 	ngx_int_t last_order_id = -1;  
+	bool is_last = false;
 
 	for (ngx_uint_t i=0; i<len; ) {
 		DiffData *match_diff = NULL;
 		DiffData *unmatch_diff = NULL;
 
 		ngx_uint_t get_size = CHUNK_SIZE;
-		if (len - i < CHUNK_SIZE) {
+		if (len - i <= CHUNK_SIZE) {
 			get_size = len - i;
+			is_last = true;
 		}
 
 		u_char md5_result[17] = {0};
-		make_md5(p, get_size, md5_result);
-		ngx_int_t match_order_id = find_match_order_id(ht, md5_result, last_order_id);
+		ngx_int_t match_order_id = -1;
+		if (!is_last) {
+			make_md5(p, get_size, md5_result);
+			match_order_id = find_match_order_id(ht, md5_result, last_order_id);
+		}
+
 		if (match_order_id == -1) { /* no found */
 			i++;
 			unmatch_len++;

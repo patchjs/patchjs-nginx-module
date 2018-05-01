@@ -207,7 +207,7 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     ngx_str_t root_path;                                    /* nginx root directory */
     ngx_str_t base_filename, ext;                           /* filename and ext */
 
-    ngx_str_t new_version, old_version;
+    ngx_str_t version, local_version;
     ngx_uint_t dot_cnt = 0, slash_cnt = 0, across_cnt = 0, count = 0;
 
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
@@ -239,6 +239,8 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     }
     path.len = last - path.data;
 
+    // url standard
+
     u_char *p = path.data + path.len - 1;
     for (int i = path.len - 1; i >= 0; i--) {
         if (*p == '.' && dot_cnt == 0) {
@@ -249,15 +251,15 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         } else if (*p == '-' && across_cnt == 0) {
             across_cnt++;
 
-            old_version.data = p + 1;
-            old_version.len = ext.data - old_version.data - 1;
+            local_version.data = p + 1;
+            local_version.len = ext.data - local_version.data - 1;
         } else if (*p == '/') {
             if (slash_cnt == 0) {
                 base_filename.data = p + 1;
-                base_filename.len = old_version.data - base_filename.data - 1;
+                base_filename.len = local_version.data - base_filename.data - 1;
             } else if (slash_cnt == 1) {
-                new_version.data = p + 1;
-                new_version.len = base_filename.data - new_version.data - 1;
+                version.data = p + 1;
+                version.len = base_filename.data - version.data - 1;
                 break;
             }
             slash_cnt++;
@@ -266,29 +268,20 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         count++;
         p--;
     }
-    
-    ngx_open_file_info_t of;
-    ngx_memzero(&of, sizeof(ngx_open_file_info_t));
-    of.read_ahead = ccf->read_ahead;
-    of.directio = ccf->directio;
-    of.valid = ccf->open_file_cache_valid;
-    of.min_uses = ccf->open_file_cache_min_uses;
-    of.errors = ccf->open_file_cache_errors;
-    of.events = ccf->open_file_cache_events;
 
     /* get file content */
-    ngx_str_t new_version_buffer, old_version_buffer;
-    ngx_int_t ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &old_version, &old_version_buffer);
+    ngx_str_t version_buffer, local_version_buffer;
+    ngx_int_t ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &local_version, &local_version_buffer);
     if (ret != NGX_OK) {
         return NGX_ERROR;
     }
-    ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &new_version, &new_version_buffer);
+    ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &version, &version_buffer);
     if (ret != NGX_OK) return NGX_ERROR;
 
     /* diff */
-    ngx_str_t *res = calc_diff_data(r, new_version_buffer.data, new_version_buffer.len, old_version_buffer.data, old_version_buffer.len);
+    ngx_str_t *res = calc_diff_data(r, version_buffer.data, version_buffer.len, local_version_buffer.data, local_version_buffer.len);
 
-    ngx_str_t type = ngx_string("text/plain");
+    ngx_str_t type = ngx_string("text/plain");// todo
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = res->len;
     r->headers_out.content_type = type;
@@ -298,7 +291,7 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         return rc;
     }
 
-    ngx_buf_t *b = ngx_create_temp_buf(r->pool, res->len);
+    ngx_buf_t *b = ngx_create_temp_buf(r->pool, res->len); //todo
     if (b == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
