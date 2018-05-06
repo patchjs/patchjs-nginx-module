@@ -118,7 +118,7 @@ ngx_int_t hash_table_put2(HashTable* ht, char* key, void* value, void(*free_valu
         }
         init_kv(kv);
         kv->next = NULL;
-        strcpy(kstr, key);
+        ngx_cpymem(kstr, key, ngx_strlen(key));
         kv->key = kstr;
         kv->value = value;
         kv->free_value = free_value;
