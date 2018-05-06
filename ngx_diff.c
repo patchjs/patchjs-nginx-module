@@ -26,8 +26,7 @@ typedef struct result {
 	ngx_array_t *diff_array;
 } Result;
 
-ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint_t src_len, u_char* dst_file_cnt, ngx_uint_t dst_len)
-{
+ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint_t src_len, u_char* dst_file_cnt, ngx_uint_t dst_len) {
 	ngx_str_t *res = (ngx_str_t *)ngx_palloc(r->pool, sizeof(ngx_str_t));
 	u_char prefix[32] = {0};
 	ngx_str_t tail = ngx_string("]}");
@@ -143,8 +142,7 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 }
 
 /* calc md5 */ 
-static u_char* make_md5(const u_char* cnt, ngx_uint_t len, u_char *result) 
-{
+static u_char* make_md5(const u_char* cnt, ngx_uint_t len, u_char *result) {
 	ngx_md5_t ctx;
 	ngx_md5_init(&ctx);
 	ngx_md5_update(&ctx, cnt, len);
@@ -152,8 +150,7 @@ static u_char* make_md5(const u_char* cnt, ngx_uint_t len, u_char *result)
 	return result;
 }
 
-static void checksum(ngx_http_request_t *r, struct HashTable *ht, u_char* file_cnt, ngx_uint_t len)
-{
+static void checksum(ngx_http_request_t *r, struct HashTable *ht, u_char* file_cnt, ngx_uint_t len) {
 	ngx_pool_t *pool = r->pool;
 	u_char *p = file_cnt;
 	ngx_uint_t order_id = 0;
@@ -185,9 +182,7 @@ static void checksum(ngx_http_request_t *r, struct HashTable *ht, u_char* file_c
 	}
 }
 
-static ngx_uint_t roll(HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt, ngx_uint_t len)
-{
-	ngx_uint_t new_content_size = 0;
+static ngx_uint_t roll(HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt, ngx_uint_t len) {
 	u_char *p = file_cnt; /* local file */
 
 	u_char *unmatch_start = file_cnt; /* point unmatch addr */
@@ -224,8 +219,6 @@ static ngx_uint_t roll(HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt,
 				unmatch_diff->order_id = -1;
 				unmatch_diff->start = unmatch_start;
 				unmatch_diff->len = unmatch_len;
-				
-				new_content_size += unmatch_len + 3;
 			}
 
 			match_diff = ngx_array_push(diff_array); 
@@ -233,8 +226,6 @@ static ngx_uint_t roll(HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt,
 			match_diff->order_id = match_order_id;
 			match_diff->start = NULL;
 			match_diff->len = 0;
-
-			new_content_size += 10;
 
 			p += get_size;
 			i += get_size;
@@ -251,8 +242,6 @@ static ngx_uint_t roll(HashTable *ht, ngx_array_t *diff_array, u_char* file_cnt,
 				unmatch_diff->order_id = -1;
 				unmatch_diff->start = unmatch_start;
 				unmatch_diff->len = unmatch_len;
-
-				new_content_size += unmatch_len + 3;
 			}
 		}
 	}
