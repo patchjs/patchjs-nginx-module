@@ -220,10 +220,6 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         return NGX_DECLINED;
     }
 
-    ngx_http_core_loc_conf_t *ccf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-    root_path.data = ccf->root.data;
-    root_path.len = ccf->root.len;
-
     /* discard body */
     ngx_int_t rc = ngx_http_discard_request_body(r);
     if (rc != NGX_OK) {
@@ -240,17 +236,14 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     path.len = last - path.data;
 
     // url standard
-
     u_char *p = path.data + path.len - 1;
-    for (int i = path.len - 1; i >= 0; i--) {
+    for (ngx_uint_t i = path.len - 1; i >= 0; i--) {
         if (*p == '.' && dot_cnt == 0) {
             dot_cnt++;
-
             ext.len = count;
             ext.data = p+1;
         } else if (*p == '-' && across_cnt == 0) {
             across_cnt++;
-
             local_version.data = p + 1;
             local_version.len = ext.data - local_version.data - 1;
         } else if (*p == '/') {
@@ -269,12 +262,22 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         p--;
     }
 
+    // basic check url format
+    if (version.len != local_version.len || ngx_strncmp(version.data, local_version.data, version.len) <= 0) {
+        return NGX_DECLINED;
+    }
+
+    ngx_http_core_loc_conf_t *ccf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+    root_path.data = ccf->root.data;
+    root_path.len = ccf->root.len;
+
     /* get file content */
     ngx_str_t version_buffer, local_version_buffer;
     ngx_int_t ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &local_version, &local_version_buffer);
     if (ret != NGX_OK) {
         return NGX_ERROR;
     }
+
     ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &version, &version_buffer);
     if (ret != NGX_OK) return NGX_ERROR;
 

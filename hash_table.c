@@ -3,35 +3,30 @@
 #include <string.h>
 #include <stdio.h>
 
-#define TABLE_SIZE (1024*1024)
-
 /* element of the hash table's chain list */
-struct kv
-{
+struct kv {
     struct kv* next;
     char* key;
+    ngx_uint_t size;
     void* value;
     void(*free_value)(void*);
 };
 
 /* HashTable */
-struct HashTable
-{
+struct HashTable {
     struct kv ** table;
     ngx_pool_t *pool;
 };
 
 /* constructor of struct kv */
-static void init_kv(struct kv* kv)
-{
+static void init_kv(struct kv* kv) {
     kv->next = NULL;
     kv->key = NULL;
     kv->value = NULL;
     kv->free_value = NULL;
 }
 /* destructor of struct kv */
-static void free_kv(struct kv* kv)
-{
+static void free_kv(struct kv* kv) {
     if (kv) {
         if (kv->free_value) {
             kv->free_value(kv->value);
@@ -42,9 +37,8 @@ static void free_kv(struct kv* kv)
     }
 }
 /* the classic Times33 hash function */
-static unsigned int hash_33(char* key)
-{
-    unsigned int hash = 0;
+static ngx_uint_t hash_33(char* key) {
+    ngx_uint_t hash = 0;
     while (*key) {
         hash = (hash << 5) + hash + *key++;
     }
@@ -52,31 +46,30 @@ static unsigned int hash_33(char* key)
 }
 
 /* new a HashTable instance */
-HashTable* hash_table_new(ngx_pool_t *pool)
-{
+HashTable* hash_table_new(ngx_pool_t *pool, ngx_uint_t size) {
     HashTable* ht = ngx_palloc(pool, sizeof(HashTable)); 
     if (NULL == ht) {
         hash_table_delete(ht);
         return NULL;
     }
     ht->pool = pool;
-    ht->table = ngx_palloc(pool, sizeof(struct kv*) * TABLE_SIZE);
+    ht->size = size;
+    ht->table = ngx_palloc(pool, sizeof(struct kv*) * ht->size);
     if (NULL == ht->table) {
         hash_table_delete(ht);
         return NULL;
     }
-    memset(ht->table, 0, sizeof(struct kv*) * TABLE_SIZE);
+    ngx_memzero(ht->table, sizeof(struct kv*) * ht->size);
 
     return ht;
 }
 
 /* delete a HashTable instance */
-void hash_table_delete(HashTable* ht)
-{
+void hash_table_delete(HashTable* ht) {
     if (ht) {
         if (ht->table) {
-            int i = 0;
-            for (i = 0; i<TABLE_SIZE; i++) {
+            ngx_uint_t i = 0;
+            for (i = 0; i<ht->size; i++) {
                 struct kv* p = ht->table[i];
                 struct kv* q = NULL;
                 while (p) {
@@ -93,14 +86,14 @@ void hash_table_delete(HashTable* ht)
 }
 
 /* insert or update a value indexed by key */
-int hash_table_put2(HashTable* ht, char* key, void* value, void(*free_value)(void*))
+ngx_int_t hash_table_put2(HashTable* ht, char* key, void* value, void(*free_value)(void*))
 {
-    int i = hash_33(key) % TABLE_SIZE;
+    ngx_int_t i = hash_33(key) % ht->size;
     struct kv* p = ht->table[i];
     struct kv* prep = p;
 
     while (p) { /* if key is already stroed, update its value */
-        if (strcmp(p->key, key) == 0) {
+        if (ngx_strcmp(p->key, key) == 0) {
             if (p->free_value) {
                 p->free_value(p->value);
             }
@@ -113,7 +106,7 @@ int hash_table_put2(HashTable* ht, char* key, void* value, void(*free_value)(voi
     }
 
     if (p == NULL) {/* if key has not been stored, then add it */
-        char* kstr = ngx_palloc(ht->pool, strlen(key) + 1);
+        u_char* kstr = ngx_palloc(ht->pool, ngx_strlen(key) + 1);
         if (kstr == NULL) {
             return -1;
         }
@@ -143,10 +136,10 @@ int hash_table_put2(HashTable* ht, char* key, void* value, void(*free_value)(voi
 /* get a value indexed by key */
 void* hash_table_get(HashTable* ht, char* key)
 {
-    int i = hash_33(key) % TABLE_SIZE;
+    ngx_int_t i = hash_33(key) % ht->size;
     struct kv* p = ht->table[i];
     while (p) {
-        if (strcmp(key, p->key) == 0) {
+        if (ngx_strcmp(key, p->key) == 0) {
             return p->value;
         }
         p = p->next;
@@ -157,12 +150,12 @@ void* hash_table_get(HashTable* ht, char* key)
 /* remove a value indexed by key */
 void hash_table_rm(HashTable* ht, char* key)
 {
-    int i = hash_33(key) % TABLE_SIZE;
+    ngx_int_t i = hash_33(key) % ht->size;
 
     struct kv* p = ht->table[i];
     struct kv* prep = p;
     while (p) {
-        if (strcmp(key, p->key) == 0) {
+        if (ngx_strcmp(key, p->key) == 0) {
             free_kv(p);
             if (p == prep) {
                 ht->table[i] = NULL;

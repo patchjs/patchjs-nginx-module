@@ -37,8 +37,8 @@ ngx_str_t * calc_diff_data(ngx_http_request_t *r, u_char* src_file_cnt, ngx_uint
 	ngx_pool_t *pool = r->pool;
 	result->pool = pool;
 
-	result->ht_dst = hash_table_new(pool);
-	result->ht_src = hash_table_new(pool);
+	result->ht_dst = hash_table_new(pool, dst_len/CHUNK_SIZE+1);
+	result->ht_src = hash_table_new(pool, src_len/CHUNK_SIZE+1);
 
 	ngx_memzero(prefix, sizeof(prefix));
 	u_char src_md5[17], dst_md5[17];

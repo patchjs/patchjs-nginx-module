@@ -9,7 +9,7 @@
 typedef struct HashTable HashTable;
 
 /* new an instance of HashTable */
-HashTable* hash_table_new(ngx_pool_t *pool);
+HashTable* hash_table_new(ngx_pool_t *pool,  ngx_uint_t size);
 
 /*
 delete an instance of HashTable,
