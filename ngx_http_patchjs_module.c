@@ -206,6 +206,7 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
 {
     ngx_str_t root_path;                                    /* nginx root directory */
     ngx_str_t base_filename, ext;                           /* filename and ext */
+    ngx_str_t pre_path;                                     /* prefix path of request url */
 
     ngx_str_t version, local_version;
     ngx_uint_t dot_cnt = 0, slash_cnt = 0, across_cnt = 0, count = 0;
@@ -267,18 +268,21 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         return NGX_DECLINED;
     }
 
+    pre_path.len = p - path.data;
+    pre_path.data = path.data;
+
     ngx_http_core_loc_conf_t *ccf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
     root_path.data = ccf->root.data;
     root_path.len = ccf->root.len;
 
     /* get file content */
     ngx_str_t version_buffer, local_version_buffer;
-    ngx_int_t ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &local_version, &local_version_buffer);
+    ngx_int_t ret = ngx_http_patchjs_get_file_buffer(r, ccf, &pre_path, &base_filename, &ext, &local_version, &local_version_buffer);
     if (ret != NGX_OK) {
         return NGX_ERROR;
     }
 
-    ret = ngx_http_patchjs_get_file_buffer(r, ccf, &root_path, &base_filename, &ext, &version, &version_buffer);
+    ret = ngx_http_patchjs_get_file_buffer(r, ccf, &pre_path, &base_filename, &ext, &version, &version_buffer);
     if (ret != NGX_OK) return NGX_ERROR;
 
     /* diff */
