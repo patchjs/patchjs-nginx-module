@@ -59,3 +59,13 @@ It enables the patchjs in a given context.
 
 Defines the **maximum** number of filesize that can be computed in a
 given context. 
+
+<br/>
+
+**patchjs_types** MIME types
+
+**default:** patchjs_types: text/css application/x-javascript
+
+context: http, server, location
+
+Defines the MIME types which can be concatenated in a given context.
