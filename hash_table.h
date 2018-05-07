@@ -23,7 +23,7 @@ free_value(if not NULL) is called automatically when the value is removed.
 return 0 if success, -1 if error occurred.
 */
 #define hash_table_put(ht,key,value) hash_table_put2(ht,key,value,NULL);
-int hash_table_put2(HashTable* ht, char* key, void* value, void(*free_value)(void*));
+ngx_int_t hash_table_put2(HashTable* ht, char* key, void* value, void(*free_value)(void*));
 
 /* get a value indexed by key, return NULL if not found. */
 void* hash_table_get(HashTable* ht, char* key);

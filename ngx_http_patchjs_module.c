@@ -237,7 +237,7 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
 
     // url standard
     u_char *p = path.data + path.len - 1;
-    for (ngx_uint_t i = path.len - 1; i >= 0; i--) {
+    for (ngx_int_t i = path.len - 1; i >= 0; i--) {
         if (*p == '.' && dot_cnt == 0) {
             dot_cnt++;
             ext.len = count;

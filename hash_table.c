@@ -7,7 +7,6 @@
 struct kv {
     struct kv* next;
     char* key;
-    ngx_uint_t size;
     void* value;
     void(*free_value)(void*);
 };
@@ -16,6 +15,7 @@ struct kv {
 struct HashTable {
     struct kv ** table;
     ngx_pool_t *pool;
+    ngx_uint_t size;
 };
 
 /* constructor of struct kv */
@@ -106,7 +106,7 @@ ngx_int_t hash_table_put2(HashTable* ht, char* key, void* value, void(*free_valu
     }
 
     if (p == NULL) {/* if key has not been stored, then add it */
-        u_char* kstr = ngx_palloc(ht->pool, ngx_strlen(key) + 1);
+        char* kstr = ngx_palloc(ht->pool, ngx_strlen(key) + 1);
         if (kstr == NULL) {
             return -1;
         }
