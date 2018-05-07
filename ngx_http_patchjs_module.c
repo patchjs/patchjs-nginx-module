@@ -306,11 +306,13 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     /* diff */
     ngx_str_t *res = calc_diff_data(r, version_buffer.data, version_buffer.len, local_version_buffer.data, local_version_buffer.len);
 
-    if (ngx_http_set_content_type(r) != NGX_OK) {
+    /*if (ngx_http_set_content_type(r) != NGX_OK) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    }
+    }*/
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = res->len;
+    
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "result: \"%V\"", res);
 
     rc = ngx_http_send_header(r);
     if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
