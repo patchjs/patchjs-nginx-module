@@ -1,5 +1,4 @@
 #include <ngx_md5.h>
-#include "hash_table.h"
 #include "ngx_diff.h"
 #include "hashmap.h"
 
