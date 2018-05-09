@@ -6,9 +6,7 @@
 
 typedef struct {
     ngx_flag_t   enable;
-    ngx_uint_t   max_file_size;
-    ngx_hash_t   types;
-    ngx_array_t *types_keys;
+    off_t   max_file_size;
 } ngx_http_patchjs_loc_conf_t;
 
 
@@ -20,12 +18,6 @@ static void *ngx_http_patchjs_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_patchjs_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
 static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r);
 
-static ngx_str_t  ngx_http_patchjs_default_types[] = {
-    ngx_string("application/x-javascript"),
-    ngx_string("text/css"),
-    ngx_null_string
-};
-
 static ngx_command_t  ngx_http_patchjs_commands[] = {
     { ngx_string("patchjs"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
@@ -35,16 +27,10 @@ static ngx_command_t  ngx_http_patchjs_commands[] = {
       NULL },
     { ngx_string("patchjs_max_file_size"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_num_slot,
+      ngx_conf_set_off_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_patchjs_loc_conf_t, max_file_size),
       NULL },
-    { ngx_string("patchjs_types"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
-      ngx_http_types_slot,
-      NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_patchjs_loc_conf_t, types_keys),
-      &ngx_http_patchjs_default_types[0] },  
       ngx_null_command
 };
 
@@ -143,11 +129,7 @@ static char *ngx_http_patchjs_merge_loc_conf(ngx_conf_t *cf, void *parent, void 
     ngx_http_patchjs_loc_conf_t *conf = child;
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
-    ngx_conf_merge_uint_value(conf->max_file_size, prev->max_file_size, 1024);
-
-    if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types, &prev->types_keys, &prev->types, ngx_http_patchjs_default_types) != NGX_OK) {
-        return NGX_CONF_ERROR;
-    }
+    ngx_conf_merge_off_value(conf->max_file_size, prev->max_file_size, 1024);
 
     return NGX_CONF_OK;
 }
@@ -169,7 +151,7 @@ static ngx_int_t ngx_http_patchjs_init(ngx_conf_t *cf) {
     return NGX_OK;
 }
 
-ngx_int_t ngx_http_patchjs_get_file_buffer(ngx_http_request_t *r, ngx_http_core_loc_conf_t *ccf, ngx_str_t *pre_path, ngx_str_t *base_filename, ngx_str_t *ext, ngx_str_t *version, ngx_str_t *buffer)
+ngx_int_t ngx_http_patchjs_get_file_buffer(ngx_http_request_t *r, ngx_http_core_loc_conf_t *ccf, ngx_str_t *pre_path, ngx_str_t *base_filename, ngx_str_t *ext, ngx_str_t *version, ngx_str_t *buffer, off_t max_file_size)
 {
     ngx_open_file_info_t of;
     ngx_memzero(&of, sizeof(ngx_open_file_info_t));
@@ -203,6 +185,10 @@ ngx_int_t ngx_http_patchjs_get_file_buffer(ngx_http_request_t *r, ngx_http_core_
     ngx_int_t open_file_ret = ngx_http_patchjs_open_file(ccf, r, &of, &filename);
     if (open_file_ret != NGX_OK) {
         return open_file_ret;
+    }
+
+    if (of.size > max_file_size * 1024) {
+        return NGX_HTTP_NOT_FOUND;
     }
 
     buffer->data = ngx_pcalloc(r->pool, of.size);
@@ -279,19 +265,15 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         p--;
     }
 
+     // support file type: js and css
+    if (ngx_strncmp(ext.data, "js", 2) != 0 && ngx_strncmp(ext.data, "css", 3) != 0) {
+        return NGX_DECLINED;
+    }
+    
     // basic check url format
     if (version.len != local_version.len || ngx_strncmp(version.data, local_version.data, version.len) <= 0) {
         return NGX_DECLINED;
     }
-
-    // support file type: js and css
-    if (ngx_strncmp(ext.data, "js", 2) != 0 && ngx_strncmp(ext.data, "css", 3) != 0) {
-        return NGX_DECLINED;
-    }
-
-    /*if (ngx_http_test_content_type(r, &clcf->types) == NULL) {
-        return NGX_HTTP_BAD_REQUEST;
-    }*/
 
     pre_path.len = p - path.data;
     pre_path.data = path.data;
@@ -300,13 +282,15 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
 
     /* get file content */
     ngx_str_t version_buffer, local_version_buffer;
-    ngx_int_t ret = ngx_http_patchjs_get_file_buffer(r, ccf, &pre_path, &base_filename, &ext, &local_version, &local_version_buffer);
+    ngx_int_t ret = ngx_http_patchjs_get_file_buffer(r, ccf, &pre_path, &base_filename, &ext, &local_version, &local_version_buffer, clcf->max_file_size);
     if (ret != NGX_OK) {
-        return NGX_ERROR;
+        return ret;
     }
 
-    ret = ngx_http_patchjs_get_file_buffer(r, ccf, &pre_path, &base_filename, &ext, &version, &version_buffer);
-    if (ret != NGX_OK) return NGX_ERROR;
+    ret = ngx_http_patchjs_get_file_buffer(r, ccf, &pre_path, &base_filename, &ext, &version, &version_buffer, clcf->max_file_size);
+    if (ret != NGX_OK) {
+        return ret;
+    }
 
     /* diff */
     ngx_str_t *res = calc_diff_data(r, version_buffer.data, version_buffer.len, local_version_buffer.data, local_version_buffer.len);
@@ -316,10 +300,6 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
     }
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = res->len;
-    
-    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "result: \"%V\"", res);
-
-    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "len: \"%d\"", res->len);
 
     rc = ngx_http_send_header(r);
     if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
