@@ -213,7 +213,7 @@ ngx_int_t hashmap_hash(map_t in, char* key, ngx_uint_t len){
 		if(m->data[curr].in_use == 0)
 			return curr;
 
-		if(m->data[curr].in_use == 1 && (strncmp(m->data[curr].key,key, len)==0))
+		if(m->data[curr].in_use == 1 && (ngx_strncmp(m->data[curr].key,key, len)==0))
 			return curr;
 
 		curr = (curr + 1) % m->table_size;
@@ -310,7 +310,7 @@ ngx_int_t hashmap_get(map_t in, char* key, ngx_uint_t len, any_t *arg){
 
         ngx_int_t in_use = m->data[curr].in_use;
         if (in_use == 1){
-            if (strncmp(m->data[curr].key,key, len)==0){
+            if (ngx_strncmp(m->data[curr].key,key, len)==0){
                 *arg = (m->data[curr].data);
                 return MAP_OK;
             }
@@ -372,7 +372,7 @@ ngx_int_t hashmap_remove(map_t in, char* key){
 
         ngx_int_t in_use = m->data[curr].in_use;
         if (in_use == 1){
-            if (strcmp(m->data[curr].key,key)==0){
+            if (ngx_strcmp(m->data[curr].key,key)==0){
                 /* Blank out the fields */
                 m->data[curr].in_use = 0;
                 m->data[curr].data = NULL;

@@ -284,6 +284,11 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
         return NGX_DECLINED;
     }
 
+    // support file type: js and css
+    if (ngx_strncmp(ext.data, "js", 2) != 0 && ngx_strncmp(ext.data, "css", 3) != 0) {
+        return NGX_DECLINED;
+    }
+
     /*if (ngx_http_test_content_type(r, &clcf->types) == NULL) {
         return NGX_HTTP_BAD_REQUEST;
     }*/
