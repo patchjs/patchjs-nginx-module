@@ -76,6 +76,7 @@ static ngx_int_t ngx_http_patchjs_read_file(u_char *buffer, ngx_http_request_t *
 }
 
 static ngx_int_t ngx_http_patchjs_open_file(ngx_http_core_loc_conf_t *ccf, ngx_http_request_t *r, ngx_open_file_info_t *of, ngx_str_t *filename) {
+    // ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "filename: \"%V\"", filename);
     ngx_int_t rc;
     if (ngx_open_cached_file(ccf->open_file_cache, filename, of, r->pool) != NGX_OK) {
         switch (of->err) {
@@ -240,7 +241,8 @@ static ngx_int_t ngx_http_patchjs_handler(ngx_http_request_t *r)
 
     // url standard
     u_char *p = path.data + path.len - 1;
-    for (ngx_int_t i = path.len - 1; i >= 0; i--) {
+    ngx_int_t i;
+    for (i = path.len - 1; i >= 0; i--) {
         if (*p == '.' && dot_cnt == 0) {
             dot_cnt++;
             ext.len = count;
