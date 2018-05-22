@@ -12,7 +12,7 @@
 
 
 /* We need to keep keys and values */
-typedef struct _hashmap_element{
+typedef struct _hashmap_element {
 	char* key;
 	ngx_int_t in_use;
 	any_t data;
@@ -20,7 +20,7 @@ typedef struct _hashmap_element{
 
 /* A hashmap has some maximum size and current size,
  * as well as the data to hold. */
-typedef struct _hashmap_map{
+typedef struct _hashmap_map {
 	ngx_int_t table_size;
 	ngx_int_t size;
 	hashmap_element *data;
@@ -153,8 +153,7 @@ static unsigned long crc32_tab[] = {
 
 /* Return a 32-bit CRC of the contents of the buffer. */
 
-unsigned long crc32(const unsigned char *s, ngx_uint_t len)
-{
+unsigned long crc32(const unsigned char *s, ngx_uint_t len) {
   ngx_uint_t i;
   unsigned long crc32val;
   
@@ -225,7 +224,7 @@ ngx_int_t hashmap_hash(map_t in, char* key, ngx_uint_t len){
 /*
  * Doubles the size of the hashmap, and rehashes all the elements
  */
-ngx_int_t hashmap_rehash(map_t in){
+ngx_int_t hashmap_rehash(map_t in) {
 	ngx_int_t i;
 	ngx_int_t old_size;
 	hashmap_element* curr;
@@ -266,7 +265,7 @@ ngx_int_t hashmap_rehash(map_t in){
 /*
  * Add a pointer to the hashmap with some key
  */
-ngx_int_t hashmap_put(map_t in, char* key, ngx_uint_t len, any_t value){
+ngx_int_t hashmap_put(map_t in, char* key, ngx_uint_t len, any_t value) {
 	ngx_int_t index;
 	hashmap_map* m;
 
@@ -294,7 +293,7 @@ ngx_int_t hashmap_put(map_t in, char* key, ngx_uint_t len, any_t value){
 /*
  * Get your pointer out of the hashmap with a key
  */
-ngx_int_t hashmap_get(map_t in, char* key, ngx_uint_t len, any_t *arg){
+ngx_int_t hashmap_get(map_t in, char* key, ngx_uint_t len, any_t *arg) {
 	ngx_int_t curr;
 	ngx_int_t i;
 	hashmap_map* m;
@@ -356,7 +355,7 @@ ngx_int_t hashmap_iterate(map_t in, PFany f, any_t item) {
 /*
  * Remove an element with that key from the map
  */
-ngx_int_t hashmap_remove(map_t in, char* key){
+ngx_int_t hashmap_remove(map_t in, char* key) {
 	ngx_int_t i;
 	ngx_int_t curr;
 	hashmap_map* m;
@@ -391,14 +390,14 @@ ngx_int_t hashmap_remove(map_t in, char* key){
 }
 
 /* Deallocate the hashmap */
-void hashmap_free(map_t in){
+void hashmap_free(map_t in) {
 	// hashmap_map* m = (hashmap_map*) in;
 	// free(m->data);
 	// free(m);
 }
 
 /* Return the length of the hashmap */
-ngx_int_t hashmap_length(map_t in){
+ngx_int_t hashmap_length(map_t in) {
 	hashmap_map* m = (hashmap_map *) in;
 	if(m != NULL) return m->size;
 	else return 0;

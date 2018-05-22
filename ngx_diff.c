@@ -12,7 +12,7 @@ static ngx_uint_t roll(map_t ht, ngx_array_t *diff_array, u_char* file_cnt, ngx_
 static ngx_int_t find_match_order_id(map_t ht, u_char *md5_result, ngx_uint_t last_order_id);
 static u_char* make_md5(const u_char* cnt, ngx_uint_t len, u_char *result);
 
-typedef struct diff_data{
+typedef struct diff_data {
 	u_char match;
 	ngx_int_t order_id;
 	u_char *start;
@@ -254,8 +254,7 @@ static ngx_uint_t roll(map_t ht, ngx_array_t *diff_array, u_char* file_cnt, ngx_
 	return 0;
 }
 
-static ngx_int_t find_match_order_id(map_t ht, u_char *md5_result, ngx_uint_t last_order_id)
-{
+static ngx_int_t find_match_order_id(map_t ht, u_char *md5_result, ngx_uint_t last_order_id) {
 	ngx_array_t *value = NULL; 
 	int ret = hashmap_get(ht, (char *)md5_result, MD5_CONTENT_SIZE, (void**)(&value));
 	if (ret == MAP_MISSING) {
